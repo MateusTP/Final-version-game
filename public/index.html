@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <title>Document</title>
+    <style>
+        header{
+            width: 100vw;
+            height: 10vh;
+            background-color: #cce5ff;
+            display: flex;
+            justify-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #004085;
+        }
+        header h1{
+            padding-top: 2vh;
+        }
+
+        #contentBox{
+            margin-top: calc(20vh );
+            display: flex;
+            justify-content: center;
+        }
+        #status{
+            margin-top: -100px;
+            height: 500px;
+            width: 300px;
+            box-shadow: 3px 3px 3px black;
+            border: 1px solid black;
+            margin-left: 50px;
+            display: flex;
+            justify-content: center;
+        }
+        #playerStatus{
+            margin-top: 25px;
+            height: 450px;
+            width: 250px;
+        }
+        #playerStatusTitle{
+            background: rgb(202, 202, 202);
+            text-align: center;
+            color: black;
+            padding: 10px;
+        }
+        #scoreElement{
+            height: 350px;
+            margin-top: 10px;
+            overflow: auto;
+        }
+        #playerScoreWrap{
+            padding: 5px;
+            display: flex;
+            justify-content: center;
+
+        }
+        #playerScoreWrap label{
+            margin-right: 4px;
+        }
+        canvas{
+            margin-top: -100px;
+            height: 500px;
+            width: 500px;
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            border: 1px solid black;
+            
+        }
+        label{
+            text-align: center;
+        }
+    </style>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+</head>
+<body>
+    <header>
+        <h1>Eat.io</h1>
+    </header>
+    <main id="contentBox">
+        <div id="box" class="alert alert-primary" >
+            <div id="title">
+                <h1>
+                    Nickname
+                </h1>
+            </div>
+    
+            <input type="text">
+            <button id="confirmButton">Play</button>
+
+        </div>
+    </main>
+ 
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        class socket {
+            constructor(){
+                this.socket = io();
+                this.socketInit();
+                this.divBox = document.querySelector('#box')
+                this.buttonElement = document.querySelector('button');
+
+                this.buttonElement.onclick = () => {
+                    this.inputElement = document.querySelector('input')
+                    this.socket.emit('nameReceive', this.inputElement.value)
+                    this.init();
+                }
+            }
+            init(){
+                this.socket.emit('onGame')
+                this.divBox.innerHTML = '';
+                this.strongElement = document.createElement('strong');
+                this.strongElement.textContent = 'Waiting for players...'
+                this.mainTextDiv = document.createElement('div');
+                this.mainTextDiv.style = 'text-align: center;display: block;';
+                this.mainTextDiv.id = 'mainText';
+                this.loadDiv = document.createElement('div');
+                this.loadDiv.style = 'text-align: center;height: 100px; width: 100px;';
+                this.loadDiv.className = 'spinner-border text-primary';
+                this.spanElement = document.createElement('span');
+                this.spanElement.className = 'sr-only';
+
+                this.divBox.appendChild(this.mainTextDiv);
+                this.divBox.appendChild(this.strongElement)
+                this.mainTextDiv.appendChild(this.loadDiv);
+                this.loadDiv.appendChild(this.spanElement);
+
+                document.addEventListener('keydown', (event) => {
+                    console.log(event.key)
+                    this.socket.emit('move', event.key);
+                })
+            }
+            socketInit(){
+                this.socket.on('gameStart', () => {
+                    const mainContentDiv = document.querySelector('main');
+                    mainContentDiv.innerHTML = ''
+
+                    const canvas = document.createElement('canvas');
+                    mainContentDiv.appendChild(canvas); 
+                    canvas.height = 10;
+                    canvas.width = 10;
+
+                    const table = document.createElement('div');
+                    table.id = 'status';
+                    mainContentDiv.appendChild(table); 
+                    
+                    const playerTable = document.createElement('div');
+                    playerTable.id = 'playerStatus';
+                    table.appendChild(playerTable);
+
+                    const playerTableTitle = document.createElement('div');
+                    playerTableTitle.id = 'playerStatusTitle';
+                    playerTableTitle.textContent = 'Scoreboard';
+                    playerTable.appendChild(playerTableTitle)
+
+                    const scoreElement = document.createElement('div') 
+                    scoreElement.id = 'scoreElement'
+                    playerTable.appendChild(scoreElement)
+
+                    this.context = canvas.getContext('2d')
+                })
+                this.socket.on('playerNick', (playerID) => {
+                    this.playerId = playerID
+                })
+                this.socket.on('gameContent', (content) => { 
+                    this.elementsCurrentInGame = content;
+                    this.render();
+                })
+                this.socket.on('numberOfPlayers', (numberOfPlayers) => {
+                    this.strongElement.textContent = `Players on game:  ${numberOfPlayers.now}/${numberOfPlayers.max}`
+                })
+                this.socket.on('end', (winner) => {
+                    const main = document.querySelector('main')
+                    main.innerHTML = `<div style="width:100vw;  margin-top: 3%;display: flex; justify-content: center; transition: 2s; background: gray;"><h1 style="color: #FFF; padding: 50px;">${winner.id} is the winner of the match with ${winner.points} points!!!</h1></div>`
+                })
+                this.socket.on('score', (score) => {
+                    console.log('a')
+                    this.scoreDiv = document.querySelector('#scoreElement')
+                    if(this.scoreDiv.innerHTML != '' ){
+                        this.scoreDiv.innerHTML = '';
+                    }
+                    for(const element in score){
+                        const player = score[element];
+                        const playerScoreWrap = document.createElement('div')
+                        playerScoreWrap.id = 'playerScoreWrap' 
+                        const playerLabel = document.createElement('label')
+                        const playerStrong = document.createElement('strong');
+                        playerScoreWrap.appendChild(playerLabel);
+                        playerScoreWrap.appendChild(playerStrong);
+                        playerLabel.textContent = player.id;
+                        playerStrong.textContent = player.points;
+                        this.scoreDiv.appendChild(playerScoreWrap)
+                    }
+                    
+                })
+                
+            }
+            render(){ 
+                this.context.clearRect(0,0,10,10)
+                for(const elementLocation in this.elementsCurrentInGame.fruits){
+                    const fruit = this.elementsCurrentInGame.fruits[elementLocation];
+                    if(fruit != undefined && fruit != null){
+                        this.context.fillStyle = 'green'
+                        this.context.fillRect(fruit.location.x,fruit.location.y,1,1)
+                    }
+                
+                }
+                for(const elementLocation in this.elementsCurrentInGame.players){
+                    const player = this.elementsCurrentInGame.players[elementLocation];
+                    if(player != undefined && player != null){
+
+                        if(player.id != this.playerId){
+                            this.context.fillStyle = 'black'
+                            this.context.fillRect(player.location.x,player.location.y,1,1)
+                        }else{
+                            this.context.fillStyle = 'orange'
+                            this.context.fillRect(player.location.x,player.location.y,1,1)
+                        }
+
+                    }
+                
+                }
+                for(const elementLocation in this.elementsCurrentInGame.powers){
+                    const power = this.elementsCurrentInGame.powers[elementLocation];
+                    if(power != undefined && power != null){
+                        this.context.fillStyle = 'blue'
+                        this.context.fillRect(power.location.x,power.location.y,1,1)
+                    }
+                
+                }
+                
+                
+            }
+        }
+        const game = new socket;
+      
+    </script>
+</body>
+</html>
